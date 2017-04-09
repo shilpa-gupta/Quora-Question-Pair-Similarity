@@ -3,6 +3,7 @@ import pickle
 import gensim.models
 from nltk.tokenize import word_tokenize
 from scipy import spatial
+import numpy as np
 
 def gen_vocab(filename):
 	count=0
@@ -30,9 +31,10 @@ def gen_features(filename):
 	fp=0
 	tn=0
 	fn=0
+	count=0
 	data_frame = pd.read_csv(filename)	
 	for index,row in data_frame.iterrows():
-		print(count)
+		#print(count)
 		count+=1
 		q1 =row['question1']
 		q2 = row['question2']
@@ -41,16 +43,23 @@ def gen_features(filename):
 		q2_word = word_tokenize(q2.lower().decode('utf-8'))
 		sum_q1 = np.zeros(100,)
 		sum_q2 = np.zeros(100,)
+		n=0
 		for word in q1_word:
+			
 			if word in model:
+				n+=1
 				count+=1
 				sum_q1 += model[word]
+		sum_q1=sum_q1/n
+		n=0
 		for word in q1_word:
 			if word in model:
+				n+=1
 				count+=1
 				sum_q2 += model[word]
+		sum_q2=sum_q2/n
 		cos_distance = spatial.distance.cosine(sum_q1,sum_q2)
-		eucledian_distance = spatial.distance.eucledian(sum_q1,sum_q2)
+		eucledian_distance = spatial.distance.euclidean(sum_q1,sum_q2)
 		print("************************************")
 		print(true_label)
 		print(cos_distance)
@@ -72,4 +81,4 @@ def gen_features(filename):
 	print(" flase positive :" ,fp)
 	print(" false negative :" ,fn)
 
-gen_vocab("/home/nidhi/NLP_Project/data/QuoraData.csv")
+gen_features("/home/nidhi/NLP_Project/data/QuoraData.csv")
