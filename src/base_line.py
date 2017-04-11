@@ -7,12 +7,11 @@ import matplotlib.pyplot as plt
 
 """
 TO-DO till tuesday
-1. gen embeddings --> find cosine/euclidean distance --> check the accuracy
+1. gen embeddings --> find cosine/euclidean distance --> check the accuracy 
 2. gen embeddings --> add the 2 questions embeddings --> classify
 3. try appending not avg and both the above approch
 4. use standard/glove embeddings and try above 3 approches
 """
-
 
 def gen_w2vmodel(filename):
     count = 0
@@ -41,14 +40,31 @@ def gen_w2vmodel(filename):
     model.save('embeddings')
 
 
+def load_dict():
+    # return gensim.models.Word2Vec.load('../models/embeddings')
+    model = {}
+    filePath = "../data/glove.6B.50d.txt"
+    with open(filePath, 'r', encoding='utf-8') as input:
+        count = 0
+        for line in input:
+            count += 1
+            print(count)
+            tokens = line.split(" ")
+            tokens[len(tokens)-1] = tokens[len(tokens)-1].strip()
+            word = tokens[0]
+            embed = np.array([float(x) for x in tokens[1:]])
+            model[word] = embed
+    return model
+
+#load_dict()
 
 def calculate_dists(filename):
-    model = gensim.models.Word2Vec.load('../models/embeddings')
-    count = 0
+    model = load_dict()
+    count = 0  
     data_frame = pd.read_csv(filename)
-    with open("../data/distances.csv", 'a') as dist_file:
+    with open("../data/distances_glove.csv", 'a') as dist_file:
         for index, row in data_frame.iterrows():
-            # print(count)
+            print(count)
             count += 1
             q1 = row['question1']
             q2 = row['question2']
@@ -62,11 +78,17 @@ def calculate_dists(filename):
             q1_word = word_tokenize(q1.lower())
             q2_word = word_tokenize(q2.lower())
 
-            sum_q1 = np.zeros(100, )
-            sum_q2 = np.zeros(100, )
+            # For model generated embeddings
+            # sum_q1 = np.zeros(100, )
+            # sum_q2 = np.zeros(100, )
+
+            # For glove embeddings
+            sum_q1 = np.zeros(50, )
+            sum_q2 = np.zeros(50, )
             n = 0
             for word in q1_word:
-                if word in model:
+                if word in model.keys():
+                # if word in model:
                     n += 1
                     sum_q1 += model[word]
             if n != 0:
@@ -74,7 +96,8 @@ def calculate_dists(filename):
 
             n = 0
             for word in q2_word:
-                if word in model:
+                # if word in model:
+                if word in model.keys():
                     n += 1
                     sum_q2 += model[word]
             if n != 0:
@@ -83,7 +106,7 @@ def calculate_dists(filename):
             cos_distance = spatial.distance.cosine(sum_q1, sum_q2)
             eucledian_distance = spatial.distance.euclidean(sum_q1, sum_q2)
             dist_file.write(",".join(str(x) for x in [true_label, cos_distance, eucledian_distance]) + '\n')
-
+#calculate_dists("../data/QuoraData.csv")
 
 def vis_distances(distFile):
     x1 = []
@@ -98,41 +121,61 @@ def vis_distances(distFile):
                 continue
             row = line.split(",")
             if int(row[0]) == 0:
-                x1.append(np.log(float(row[1])))
-                y1.append(np.log(float(row[2].strip())))
+                x1.append(float(row[1]))
+                y1.append(float(row[2].strip()))
             else:
-                x2.append(np.log(float(row[1])))
-                y2.append(np.log(float(row[2].strip())))
+                x2.append(float(row[1]))
+                y2.append(float(row[2].strip()))
     plt.scatter(x1, y1, color='red')
     plt.scatter(x2, y2, color='blue')
-
     plt.show()
 
-vis_distances("../data/distances.csv")
+#vis_distances("../data/distances.csv")
 
+
+"""
+Threshoulds
+
+normal embeddings :
+    cosine distance (x-axis in scatter) (> 0.251566 are red)
+    euclidian distance (x-axis in scatter) ( > 2.063 are red)
+
+glove embeddings : 
+    cosine distance (x-axis in scatter) (>0.291009 are red)
+    euclidian distance (x-axis in scatter) (>2.58611 are red)
+
+"""
 def calculate_accuracy(distFile):
-    threshold_cos = 0
-    threshold_euc = 0
+    threshold_cos = 0.291009
+    threshold_euc = 2.58611
     tp = 0
     fp = 0
     tn = 0
     fn = 0
     with open(distFile, 'r') as dist_file:
+        count = 0
         for line in dist_file:
+            if count == 0:
+                count += 1
+                continue
             cols = line.split(",")
-            cos_distance = cols[1]
+            # cos_distance = cols[1]
+            euc_distance = cols[2].strip()
             true_label = cols[0]
-        if cos_distance > threshold_cos:
-            if true_label == 0:
-                tn += 1
+            if float(euc_distance) > threshold_euc:
+                if int(true_label) == 0:
+                    tn += 1
+                else:
+                    fn += 1
             else:
-                fn += 1
-        else:
-            if true_label == 1:
-                tp += 1
-            else:
-                fp += 1
+                if int(true_label) == 1:
+                    tp += 1
+                else:
+                    fp += 1
+    print("glove embeddings for cosine distance")
     print(" true positive :", tp)
     print(" true negative :", tn)
     print(" flase positive :", fp)
     print(" false negative :", fn)
+
+calculate_accuracy("../data/distances_glove.csv")

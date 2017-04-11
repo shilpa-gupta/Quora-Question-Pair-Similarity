@@ -1,0 +1,27 @@
+normal embeddings for cosine distance
+ 	true positive : 149219
+ 	true negative : 2968
+ 	flase positive : 251933
+ 	false negative : 28
+	Accuracy : 37.6%
+
+normal embeddings for euclidian distance
+ 	true positive : 149221
+ 	true negative : 1109
+ 	flase positive : 253792
+ 	false negative : 26
+ 	Accuracy : 37.2%
+
+glove embeddings for cosine distance
+ 	true positive : 149232
+ 	true negative : 960
+ 	flase positive : 253940
+ 	false negative : 15
+ 	Accuracy : 37.1%
+
+glove embeddings for euclidian distance
+ 	true positive : 149227
+ 	true negative : 2604
+ 	flase positive : 252296
+ 	false negative : 20
+ 	Accuracy : 37.5%
