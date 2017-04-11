@@ -10,7 +10,7 @@ from scipy.spatial.distance import cosine, cityblock, jaccard, canberra, euclide
 from nltk import word_tokenize
 stop_words = stopwords.words('english')
 
-model = gensim.models.Word2Vec.load('../models/embeddings')
+model = gensim.models.KeyedVectors.load_word2vec_format('../sample/GoogleNews-vectors-negative300.bin.gz', binary=True)
 """
 Basic fetaures :
     Length of question1
@@ -42,27 +42,84 @@ def fuzzy_features(data):
 	data['fuzz_token_set_ratio'] = data.apply(lambda x: fuzz.token_set_ratio(str(x['question1']), str(x['question2'])), axis=1)	
 	data['fuzz_token_sort_ratio'] = data.apply(lambda x: fuzz.token_sort_ratio(str(x['question1']), str(x['question2'])), axis=1)	
 
-def word_mover_distance(s1,s2):
-	s1 = str(s1).lower().split()
-	s2 = str(s2).lower().split()
-	stop_words = stopwords.words('english')
-	s1 = [w for w in s1 if w not in stop_words]
-	s2 = [w for w in s2 if w not in stop_words]	
-	return model.wmdistance(s1, s2)
+def sent2vec(s):
+    words = str(s).lower().decode('utf-8')
+    words = word_tokenize(words)
+    words = [w for w in words if not w in stop_words]
+    words = [w for w in words if w.isalpha()]
+    M = []
+    for w in words:
+        try:
+            M.append(model[w])
+        except:
+            continue
+    M = np.array(M)
+    v = M.sum(axis=0)
+    return v / np.sqrt((v ** 2).sum())
 
-def gen_distance_metrics
+
+def gen_distance_metrics(data,question1_vectors,question2_vectors):
+
+	data['cosine_distance'] = [cosine(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['cityblock_distance'] = [cityblock(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['jaccard_distance'] = [jaccard(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['canberra_distance'] = [canberra(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['euclidean_distance'] = [euclidean(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['minkowski_distance'] = [minkowski(x, y, 3) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['braycurtis_distance'] = [braycurtis(x, y) for (x, y) in zip(np.nan_to_num(question1_vectors),
+	                                                          np.nan_to_num(question2_vectors))]
+	data['skew_q1vec'] = [skew(x) for x in np.nan_to_num(question1_vectors)]
+	data['skew_q2vec'] = [skew(x) for x in np.nan_to_num(question2_vectors)]
+	data['kur_q1vec'] = [kurtosis(x) for x in np.nan_to_num(question1_vectors)]
+	data['kur_q2vec'] = [kurtosis(x) for x in np.nan_to_num(question2_vectors)]
+
 
 def main():
-	data = pd.read_csv('../sample/quora_features_local.csv')
-	#length_features(data)
-	#fuzzy_features(data)
-
-	data['wmd'] = data.apply(lambda x: word_mover_distance(x['question1'], x['question2']), axis=1)
+	data = pd.read_csv('../data/QuoraData.csv')
+	labels=data['is_duplicate']
+	data.drop(['is_duplicate','qid1','qid2'],axis=1,inplace=True)
 	
+	length_features(data)
+	fuzzy_features(data)
+	
+	question1_vectors = np.zeros((data.shape[0], 300))
+	error_count = 0
+
+	for i, q in tqdm(enumerate(data.question1.values)):
+		question1_vectors[i, :] = sent2vec(q)
+	question2_vectors  = np.zeros((data.shape[0], 300))
+	for i, q in tqdm(enumerate(data.question2.values)):
+		question2_vectors[i, :] = sent2vec(q)
+	gen_distance_metrics(data,question1_vectors,question2_vectors)
+
+	data['labels']=labels
+	data.to_csv('../data/quora_features.csv', index=False)
+	
+def modify_csv(filename):
+	data = pd.read_csv(filename)
+	data.drop('\xef\xbb\xbfid',axis=1,inplace=True)
+	data.to_csv('../data/quora_features.csv', index=False)
 
 
-	data.to_csv('../sample/quora_features_local.csv', index=False)
 
-
-
-main()
+def writeTrainDataToARFF():	
+	with open('../data/quora' + ".arff", 'w') as f:
+		data = pd.read_csv('../data/quora_features.csv')
+		featureNames = data.columns
+		f.write('@RELATION ' + 'quora' + '\n')
+		for fn in featureNames:
+			f.write('@ATTRIBUTE ' + fn + ' REAL\n')
+		f.write('@ATTRIBUTE class {0,1}'+'\n')
+		f.write('@DATA\n')
+		with open('../data/quora_features','r') as fin:
+			for line in fin:
+				line=line.strip()
+				f.write(str(line)+'\n')
+	f.close()
+writeTrainDataToARFF()
