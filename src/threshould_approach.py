@@ -5,14 +5,11 @@ from scipy import spatial
 import numpy as np
 import matplotlib.pyplot as plt
 
-"""
-TO-DO till tuesday
-1. gen embeddings --> find cosine/euclidean distance --> check the accuracy 
-2. gen embeddings --> add the 2 questions embeddings --> classify
-3. try appending not avg and both the above approch
-4. use standard/glove embeddings and try above 3 approches
-"""
 
+"""
+This function is to train a word2vec model based on skipgram approach
+using the Quora Data itself as vocabulary
+"""
 def gen_w2vmodel(filename):
     count = 0
     data_frame = pd.read_csv(filename)
@@ -39,9 +36,11 @@ def gen_w2vmodel(filename):
     w2v = dict(zip(model.index2word, model.syn0))
     model.save('embeddings')
 
-
+"""
+This function is used to load the glove embeddings into a dictionary
+which we will later use to generate the embedding representation of questions
+"""
 def load_dict():
-    # return gensim.models.Word2Vec.load('../models/embeddings')
     model = {}
     filePath = "../data/glove.6B.50d.txt"
     with open(filePath, 'r', encoding='utf-8') as input:
@@ -58,6 +57,10 @@ def load_dict():
 
 #load_dict()
 
+"""
+This function is for calculating distances between the question pairs 
+and saving them in a csv file.
+"""
 def calculate_dists(filename):
     model = load_dict()
     count = 0  
@@ -88,7 +91,6 @@ def calculate_dists(filename):
             n = 0
             for word in q1_word:
                 if word in model.keys():
-                # if word in model:
                     n += 1
                     sum_q1 += model[word]
             if n != 0:
@@ -96,7 +98,6 @@ def calculate_dists(filename):
 
             n = 0
             for word in q2_word:
-                # if word in model:
                 if word in model.keys():
                     n += 1
                     sum_q2 += model[word]
@@ -108,6 +109,9 @@ def calculate_dists(filename):
             dist_file.write(",".join(str(x) for x in [true_label, cos_distance, eucledian_distance]) + '\n')
 #calculate_dists("../data/QuoraData.csv")
 
+"""
+this function is to visulise the scatter plot of distances among the question pairs
+"""
 def vis_distances(distFile):
     x1 = []
     y1 = []
@@ -134,8 +138,10 @@ def vis_distances(distFile):
 
 
 """
-Threshoulds
+Here we are calculating the accuracy after coming up the threshoulds according to
+scatter plots plotted above
 
+Threshoulds
 normal embeddings :
     cosine distance (x-axis in scatter) (> 0.251566 are red)
     euclidian distance (x-axis in scatter) ( > 2.063 are red)
@@ -143,7 +149,6 @@ normal embeddings :
 glove embeddings : 
     cosine distance (x-axis in scatter) (>0.291009 are red)
     euclidian distance (x-axis in scatter) (>2.58611 are red)
-
 """
 def calculate_accuracy(distFile):
     threshold_cos = 0.291009
