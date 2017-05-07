@@ -39,7 +39,7 @@ def create_data_matrices(input_dataset):
 	return np.array(question_array1), np.array(question_array2), is_same_array
 
 # load the processed Quora dataset
-with open("data/data_tuples_glovem.p", "rb") as f:
+with open("../data/data_tuples_glovem.p", "rb") as f:
 	total_dataset = cPickle.load(f)
 print("Loaded the data tuples")
 logger_file.write("Loaded the data tuples")
@@ -56,7 +56,7 @@ for instance in total_dataset:
 print("Removed pairs with empty sentences. Remaining num. of data tuples ", len(dataset))
 logger_file.write("Removed pairs with empty sentences. Remaining num. of data tuples " + str(len(dataset)))
 # Load glove vector dict (only for the needed words)
-with open("data/needed_glovem_dict.p", "rb") as f:
+with open("../data/needed_glovem_dict.p", "rb") as f:
 	glove_embedding_dict = cPickle.load(f)
 
 print("Loaded the Glove dictionary for necessary words")
@@ -170,7 +170,7 @@ print(full_model.summary())
 #logger_file.write(full_model.summary())
 
 #saves the model weights after each epoch if the validation loss decreased
-checkpointer = ModelCheckpoint(filepath="models_asmita/weights-{epoch:02d}-{val_loss:.2f}.hdf5",monitor='val_acc', verbose=1, save_best_only=False)
+checkpointer = ModelCheckpoint(filepath="../models/weights-{epoch:02d}-{val_loss:.2f}.hdf5",monitor='val_acc', verbose=1, save_best_only=False)
 
 full_model.fit( [train_data_matrix1, train_data_matrix2], label_train, validation_data=([test_data_matrix1, test_data_matrix2], label_test), nb_epoch=12, batch_size=128, verbose=1, callbacks=[checkpointer])
 
