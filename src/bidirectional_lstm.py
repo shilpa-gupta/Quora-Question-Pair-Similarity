@@ -7,9 +7,9 @@ from keras.regularizers import l2
 from keras.callbacks import ModelCheckpoint
 import cPickle
 
-logger_file = open('logfile_asmita', 'w')
-# Create data matrices and labels list from processed data tuples
-def create_data_matrices(input_dataset):
+logger_file = open('logfile', 'w')
+
+def generate_matrix(input_dataset):
 	question_array1 = []
 	question_array2 = []
 	is_same_array = []
@@ -38,11 +38,11 @@ def create_data_matrices(input_dataset):
 
 	return np.array(question_array1), np.array(question_array2), is_same_array
 
-# load the processed Quora dataset
+
 with open("../data/data_tuples_glovem.p", "rb") as f:
 	total_dataset = cPickle.load(f)
-print("Loaded the data tuples")
-logger_file.write("Loaded the data tuples")
+
+logger_file.write("LOAD DATA INSTANCES")
 dataset = []
 
 #pre_data_tuples of the form ('what is the story of kohinoor koh i noor diamond', 'what would happen if the indian government stole the kohinoor koh i noor diamond back', 0)
@@ -53,21 +53,21 @@ for instance in total_dataset:
 	if(len_s1==0 or len_s2==0):
 		continue
 	dataset.append(instance)
-print("Removed pairs with empty sentences. Remaining num. of data tuples ", len(dataset))
-logger_file.write("Removed pairs with empty sentences. Remaining num. of data tuples " + str(len(dataset)))
+print("REMOVE EMPTY SENTENCES, REMAINING INSTANCES", len(dataset))
+logger_file.write("REMOVE EMPTY SENTENCES, REMAINING INSTANCES" + str(len(dataset)))
 # Load glove vector dict (only for the needed words)
 with open("../data/needed_glovem_dict.p", "rb") as f:
 	glove_embedding_dict = cPickle.load(f)
 
-print("Loaded the Glove dictionary for necessary words")
-logger_file.write("Loaded the Glove dictionary for necessary words")
+print("AVAILABLE GLOVE DICTIONARY LOADED")
+logger_file.write("AVAILABLE GLOVE DICTIONARY LOADED")
 glove_dim = glove_embedding_dict[glove_embedding_dict.keys()[1]].shape[0]
 vocab_size = 80405 + 1#80313#80419 # Pass this from analyze_data, instead of hardcoding.80312
 
 # Initialize embedding matrix with each entry sampled uniformly at random between -1.0 and 1.0
-init_glove_matrix =  np.random.uniform(-1.0, 1.0, size=(vocab_size, glove_dim))
-print("Initialized glove matrix with uniform. Will overwrite known vectors in it now")
-logger_file.write("Initialized glove matrix with uniform. Will overwrite known vectors in it now")
+precomputed_glove_embeddings =  np.random.uniform(-1.0, 1.0, size=(vocab_size, glove_dim))
+print("RANDOM EMBEDDING ASSIGNMENT TO WORDS")
+logger_file.write("RANDOM EMBEDDING ASSIGNMENT TO WORDS")
 # First create a dictionary from word to idx (for all distinct words)
 word_to_id = {}
 sentence_word_limit = 0
@@ -88,29 +88,23 @@ for instance in dataset:
 		if(word not in word_to_id):
 			word_to_id[word] = unique_id
 			if(word in glove_embedding_dict):
-				init_glove_matrix[unique_id] = glove_embedding_dict[word]
+				precomputed_glove_embeddings[unique_id] = glove_embedding_dict[word]
 			unique_id += 1
 
 	for word in sentence2:
 		if(word not in word_to_id):
 			word_to_id[word] = unique_id
 			if word in glove_embedding_dict:
-				init_glove_matrix[unique_id] = glove_embedding_dict[word]
+				precomputed_glove_embeddings[unique_id] = glove_embedding_dict[word]
 			unique_id += 1
 
-print("Max sentence length in data ", sentence_word_limit)
-logger_file.write("Max sentence length in data " + str(sentence_word_limit))
+print("MAX WORD LIMIT ", sentence_word_limit)
+logger_file.write("MAX WORD LIMIT " + str(sentence_word_limit))
 sentence_lengths = np.array(sentence_lengths)
-print("Num more than 50 ", np.sum(sentence_lengths>=50))
-#logger_file.write("Num more than 50 ", np.sum(sentence_lengths>=50))
-print("Num more than 60 ", np.sum(sentence_lengths>=60))
 
-#logger_file.write("Num more than 60 ", np.sum(sentence_lengths>=60))
 TUNING_PARAMETER = 60
 sentence_word_limit = min(sentence_word_limit, TUNING_PARAMETER)
 
-
-# Train, Test lists creation. Test here is technically more like Validation
 train_data_matrix1 = []
 train_data_matrix2 = []
 label_train = []
@@ -120,65 +114,47 @@ label_test = []
 
 train_pc = 0.8
 num_train = int(np.ceil(train_pc*len(dataset)))
-random.seed(186) # Fixing random seed for reproducibility
+random.seed(186)
 random.shuffle(dataset)
 
-# TRAIN - TEST SPLIT OF THE TUPLES
 train_dataset = dataset[0: num_train]
 test_dataset = dataset[num_train:]
-print("Num of training examples ", len(train_dataset))
-logger_file.write("Num of training examples "+ str(len(train_dataset)))
+print("TRAIN DATASET LENGTH", len(train_dataset))
+logger_file.write("TRAIN DATASET LENGTH "+ str(len(train_dataset)))
 
-train_data_matrix1, train_data_matrix2, label_train = create_data_matrices(train_dataset)
-test_data_matrix1, test_data_matrix2, label_test = create_data_matrices(test_dataset)
-print("Created Training and Test Matrices, and corresponding label vectors")
-logger_file.write("Created Training and Test Matrices, and corresponding label vectors")
+train_data_matrix1, train_data_matrix2, label_train = generate_matrix(train_dataset)
+test_data_matrix1, test_data_matrix2, label_test = generate_matrix(test_dataset)
+print("GENERATING TRAINING AND TEST MATRIX")
+logger_file.write("GENERATING TRAINING AND TEST MATRIX")
 
-# create the model
 embedding_size= 300
-#vocab_size = total_num_words + 1 # since the <none> token is extra
 model = Sequential()
-model.add(Embedding(input_dim=vocab_size, output_dim=embedding_size, weights=[init_glove_matrix]))
+model.add(Embedding(input_dim=vocab_size, output_dim=embedding_size, weights=[precomputed_glove_embeddings]))
 model.add(Bidirectional(LSTM(100, dropout_W=0.5, dropout_U=0.5)))
-print("Done building core model")
-logger_file.write("Done building core model")
 
-# Inputs to Full Model
-#input_dim = sentence_word_limit
 sentence_input1 = Input(shape=(sentence_word_limit,))
 sentence_input2 = Input(shape=(sentence_word_limit,))
 
-# Send them through same model (weights will be thus shared)
-processed_1 = model(sentence_input1)
-processed_2 = model(sentence_input2)
+#merge_input1 = model(sentence_input1)
+#merge_input2 = model(sentence_input2)
 
-print("Going to merge the two branches at model level")
-logger_file.write("Going to merge the two branches at model level")
+merged = merge([model(sentence_input1), model(sentence_input2)], mode='concat')
 
-merged = merge([processed_1, processed_2], mode='concat')
+fully_connected = Dense(100, activation='relu', W_regularizer=l2(0.0001), b_regularizer=l2(0.0001), name='fully_connected')(merged)
+fully_connected_drop = Dropout(0.4)(fully_connected) 
 
-# Add an FC layer before the Clf layer (non-lin layer after the lstm 'thought vecs' concatenation)
-merged_fc = Dense(100, activation='relu', W_regularizer=l2(0.0001), b_regularizer=l2(0.0001), name='merged_fc')(merged)
-merged_fc_drop = Dropout(0.4)(merged_fc) # Prevent overfitting at the fc layer
+final_layer = Dense(1, activation='sigmoid', name='final_layer')(fully_connected_drop)
 
-main_output = Dense(1, activation='sigmoid', name='main_output')(merged_fc_drop)
+final_built_model = Model( input=[sentence_input1, sentence_input2], output=final_layer )
 
-full_model = Model( input=[sentence_input1, sentence_input2], output=main_output )
+final_built_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+print(final_built_model.summary())
 
-full_model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-print(full_model.summary())
-#logger_file.write(full_model.summary())
+model_writer = ModelCheckpoint(filepath="../models/weights-{epoch:02d}-{val_loss:.2f}.hdf5",monitor='val_acc', verbose=1, save_best_only=False)
 
-#saves the model weights after each epoch if the validation loss decreased
-checkpointer = ModelCheckpoint(filepath="../models/weights-{epoch:02d}-{val_loss:.2f}.hdf5",monitor='val_acc', verbose=1, save_best_only=False)
+final_built_model.fit( [train_data_matrix1, train_data_matrix2], label_train, validation_data=([test_data_matrix1, test_data_matrix2], label_test), nb_epoch=2, batch_size=128, verbose=1, callbacks=[model_writer])
 
-full_model.fit( [train_data_matrix1, train_data_matrix2], label_train, validation_data=([test_data_matrix1, test_data_matrix2], label_test), nb_epoch=12, batch_size=128, verbose=1, callbacks=[checkpointer])
-
-
-
-
-# Final evaluation of the model
-scores = full_model.evaluate( [test_data_matrix1, test_data_matrix2], label_test, verbose=1)
+scores = final_built_model.evaluate( [test_data_matrix1, test_data_matrix2], label_test, verbose=1)
 print("Accuracy: %.2f%%" % (scores[1]*100))
 logger_file.write("Accuracy"  + str(scores[1]*100))
 logger_file.write("DUMPING DATA")
