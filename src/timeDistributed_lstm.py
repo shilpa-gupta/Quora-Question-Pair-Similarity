@@ -1,13 +1,15 @@
 import numpy as np
 import csv, json
-from os.path import expanduser, exists
+from os.path import exists
 from sklearn.model_selection import train_test_split
 from keras.models import Sequential
 from keras.preprocessing.text import Tokenizer
+from keras.callbacks import Callback, ModelCheckpoint
 from keras.preprocessing.sequence import pad_sequences
 from keras.layers import Embedding, Dense, Dropout, Reshape, Merge, BatchNormalization, TimeDistributed, Lambda
+from keras.preprocessing.text import Tokenizer
 from keras.regularizers import l2
-from keras.callbacks import Callback, ModelCheckpoint
+
 from keras import backend as K
 from keras.utils.data_utils import get_file
 
@@ -15,7 +17,7 @@ from keras.utils.data_utils import get_file
 '''initial length constants'''
 LEN_EMBEDDING = 300
 MAX_SENTENCE_LENGTH = 25
-MAX_NB_WORDS = 200000
+NB_LIMIT = 200000
 
 
 if exists('../data/question1_train.npy') and exists('../data/question2_train.npy') and exists('../data/true_labels_train.npy') and exists('../data/nb_words.json') and exists('../data/word_embedding_matrix.npy'):
@@ -27,22 +29,22 @@ if exists('../data/question1_train.npy') and exists('../data/question2_train.npy
         nb_words = json.load(f)['nb_words']
 
 else:
-    question1 = []
-    question2 = []
+    q_instance_1 = []
+    q_instance_2 = []
     is_duplicate = []
     with open('../data/QuoraData.csv') as infile:
         reader = csv.DictReader(infile)
 
         for row in reader:
-            question1.append(row['question1'])
-            question2.append(row['question2'])
+            q_instance_1.append(row['question1'])
+            q_instance_2.append(row['question2'])
             is_duplicate.append(row['is_duplicate'])
 
-    questions = question1 + question2
+    questions = q_instance_1 + q_instance_2
     tokenizer = Tokenizer(nb_words='../data/nb_words.json')
     tokenizer.fit_on_texts(questions)
-    question1_word_sequences = tokenizer.texts_to_sequences(question1)
-    question2_word_sequences = tokenizer.texts_to_sequences(question2)
+    seq_1 = tokenizer.texts_to_sequences(q_instance_1)
+    seq_2 = tokenizer.texts_to_sequences(q_instance_2)
     word_index = tokenizer.word_index
 
 
@@ -51,24 +53,22 @@ else:
         for line in infile:
             values = line.split(' ')
             word = values[0]
-            embedding = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = embedding
+	    embeddings_index[word] = np.asarray(values[1:], dtype='float32')
 
 
 
-    nb_words = min(MAX_NB_WORDS, len(word_index))
+    nb_words = min(NB_LIMIT, len(word_index))
     word_embedding_matrix = np.zeros((nb_words + 1, LEN_EMBEDDING))
     for word, i in word_index.items():
-        if i > MAX_NB_WORDS:
+        if i > NB_LIMIT:
             continue
-        embedding_vector = embeddings_index.get(word)
-        if embedding_vector is not None:
-            word_embedding_matrix[i] = embedding_vector
+        if embeddings_index.get(word) is not None:
+            word_embedding_matrix[i] = embeddings_index.get(word)
         
     
 
-    q1_data = pad_sequences(question1_word_sequences, maxlen=MAX_SENTENCE_LENGTH)
-    q2_data = pad_sequences(question2_word_sequences, maxlen=MAX_SENTENCE_LENGTH)
+    q1_data = pad_sequences(seq_1, maxlen=MAX_SENTENCE_LENGTH)
+    q2_data = pad_sequences(seq_2, maxlen=MAX_SENTENCE_LENGTH)
     labels = np.array(is_duplicate, dtype=int)
     
     np.save(open('../data/question1_train.npy', 'wb'), q1_data)
